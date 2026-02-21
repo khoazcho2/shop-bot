@@ -1,336 +1,196 @@
 import os
 from telegram import *
 from telegram.ext import *
-from flask import Flask
-from threading import Thread
-
-# =========================
-# CẤU HÌNH
-# =========================
 
 TOKEN = "8462718923:AAFVPS1q92tr16czaextWLanU2HsPgZUPaQ"
-ADMIN_ID = 8337495954
+ADMIN_ID = 8337495954  # ← ID TELEGRAM CỦA BẠN
 
-# =========================
-# KEEP ALIVE RENDER
-# =========================
+waiting = {}
 
-app = Flask(__name__)
-
-@app.route('/')
-def home():
-    return "BOT HO QUOC ONLINE"
-
-def run_web():
-    app.run(host="0.0.0.0", port=10000)
-
-def keep_alive():
-    t = Thread(target=run_web)
-    t.start()
-
-# =========================
-# DATA
-# =========================
-
-waiting_ff = {}
-
-# =========================
+# =================
 # START
-# =========================
+# =================
 
 def start(update, context):
 
     keyboard = [
-        ["🎮 ACC FREE FIRE"],
-        ["💎 MUA ROBUX"]
+        ["🎮 ACC FREE FIRE"]
     ]
 
     update.message.reply_text(
-
-        "🔥 SHOP HỒ QUỐC 🔥\n\nChọn dịch vụ:",
-
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard,
-            resize_keyboard=True
-        )
+        "🔥 SHOP HỒ QUỐC 🔥",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 
-# =========================
-# MENU FREE FIRE
-# =========================
+# =================
+# MENU ACC
+# =================
 
-def menu_ff(update, context):
+def menu(update, context):
 
     keyboard = [
-
         ["💰 ACC 120K"],
         ["💰 ACC 200K"],
-        ["💰 ACC 300K"],
-        ["💰 ACC 500K"]
-
+        ["⬅️ BACK"]
     ]
 
     update.message.reply_text(
-
         "Chọn acc:",
-
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard,
-            resize_keyboard=True
-        )
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 
-# =========================
-# CHỌN ACC
-# =========================
+# =================
+# KHÁCH CHỌN ACC
+# =================
 
 def chon_acc(update, context):
 
-    gia = update.message.text.replace(
-        "💰 ACC ", ""
-    ).replace("K", "")
+    gia = update.message.text.replace("💰 ACC ","").replace("K","")
 
-    waiting_ff[update.message.chat_id] = gia
+    user_id = update.message.chat_id
+
+    waiting[user_id] = gia
 
     context.bot.send_photo(
-
-        update.message.chat_id,
-
-        photo=open("qr.jpg", "rb"),
-
-        caption=f"""
-ACC FF {gia}K
-
-Chuyển khoản rồi bấm:
-"""
+        user_id,
+        photo=open("qr.jpg","rb"),
+        caption="Chuyển khoản rồi bấm ĐÃ THANH TOÁN"
     )
 
     keyboard = [["✅ ĐÃ THANH TOÁN"]]
 
     update.message.reply_text(
-
-        "Sau khi chuyển khoản bấm:",
-
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard,
-            resize_keyboard=True
-        )
+        "Bấm nút sau khi chuyển:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 
-# =========================
+# =================
 # KHÁCH BẤM THANH TOÁN
-# =========================
+# =================
 
-def da_thanhtoan(update, context):
+def thanhtoan(update, context):
 
     user = update.message.from_user
-
     user_id = update.message.chat_id
 
-    if user_id not in waiting_ff:
+    if user_id not in waiting:
         return
 
-    gia = waiting_ff[user_id]
+    gia = waiting[user_id]
 
     keyboard = InlineKeyboardMarkup([
-
         [
-
             InlineKeyboardButton(
-
                 "✅ DUYỆT",
-
                 callback_data=f"duyet|{user_id}|{gia}"
             ),
-
             InlineKeyboardButton(
-
                 "❌ HỦY",
-
-                callback_data="huy"
+                callback_data=f"huy|{user_id}"
             )
-
         ]
-
     ])
 
     context.bot.send_message(
-
         ADMIN_ID,
-
         f"""
-KHÁCH MUA ACC
+KHÁCH ĐÃ THANH TOÁN
 
 User: @{user.username}
-
+ID: {user_id}
 Gói: {gia}K
 """,
-
         reply_markup=keyboard
-
     )
 
     update.message.reply_text(
-
-        "Đã gửi admin xác nhận"
+        "⏳ Chờ admin xác nhận..."
     )
 
-# =========================
+# =================
 # ADMIN DUYỆT
-# =========================
+# =================
 
-def duyet(update, context):
+def callback(update, context):
 
     query = update.callback_query
-
     data = query.data.split("|")
 
-    user_id = int(data[1])
+    if data[0] == "duyet":
 
-    gia = data[2]
+        user_id = int(data[1])
+        gia = data[2]
 
-    file = f"acc_ff/{gia}.txt"
+        file = f"acc_ff/{gia}.txt"
 
-    if not os.path.exists(file):
+        if not os.path.exists(file):
+
+            context.bot.send_message(user_id,"Hết acc")
+            return
+
+        with open(file,"r") as f:
+
+            accs = f.readlines()
+
+        if len(accs) == 0:
+
+            context.bot.send_message(user_id,"Hết acc")
+            return
+
+        acc = accs[0]
+
+        with open(file,"w") as f:
+
+            f.writelines(accs[1:])
 
         context.bot.send_message(
             user_id,
-            "Hết acc"
-        )
-
-        return
-
-    with open(file, "r", encoding="utf-8") as f:
-
-        accs = f.readlines()
-
-    if len(accs) == 0:
-
-        context.bot.send_message(
-            user_id,
-            "Hết acc"
-        )
-
-        return
-
-    acc = accs[0]
-
-    with open(file, "w", encoding="utf-8") as f:
-
-        f.writelines(accs[1:])
-
-    context.bot.send_message(
-
-        user_id,
-
-        f"""
-THANH TOÁN THÀNH CÔNG
+            f"""
+✅ THANH TOÁN THÀNH CÔNG
 
 ACC CỦA BẠN:
 
 {acc}
 """
-    )
-
-    query.edit_message_text(
-        "ĐÃ DUYỆT"
-    )
-
-# =========================
-# MENU ROBUX
-# =========================
-
-def robux(update, context):
-
-    keyboard = [
-
-        ["50K"],
-        ["100K"],
-        ["500K"]
-
-    ]
-
-    update.message.reply_text(
-
-"""
-BẢNG GIÁ ROBUX
-
-50K = 150
-100K = 300
-500K = 1500
-""",
-
-        reply_markup=ReplyKeyboardMarkup(
-            keyboard,
-            resize_keyboard=True
         )
-    )
 
-# =========================
+        query.edit_message_text("ĐÃ DUYỆT")
+
+    elif data[0] == "huy":
+
+        user_id = int(data[1])
+
+        context.bot.send_message(
+            user_id,
+            "❌ Thanh toán bị từ chối"
+        )
+
+        query.edit_message_text("ĐÃ HỦY")
+
+# =================
 # MAIN
-# =========================
+# =================
 
 def main():
 
-    updater = Updater(
-        TOKEN,
-        use_context=True
-    )
+    updater = Updater(TOKEN, use_context=True)
 
     dp = updater.dispatcher
 
-    dp.add_handler(
-        CommandHandler(
-            "start",
-            start
-        )
-    )
+    dp.add_handler(CommandHandler("start", start))
 
-    dp.add_handler(
-        MessageHandler(
-            Filters.regex("ACC FREE FIRE"),
-            menu_ff
-        )
-    )
+    dp.add_handler(MessageHandler(Filters.regex("ACC FREE FIRE"), menu))
 
-    dp.add_handler(
-        MessageHandler(
-            Filters.regex("ACC"),
-            chon_acc
-        )
-    )
+    dp.add_handler(MessageHandler(Filters.regex("ACC"), chon_acc))
 
-    dp.add_handler(
-        MessageHandler(
-            Filters.regex("ĐÃ THANH TOÁN"),
-            da_thanhtoan
-        )
-    )
+    dp.add_handler(MessageHandler(Filters.regex("ĐÃ THANH TOÁN"), thanhtoan))
 
-    dp.add_handler(
-        MessageHandler(
-            Filters.regex("ROBUX"),
-            robux
-        )
-    )
-
-    dp.add_handler(
-        CallbackQueryHandler(
-            duyet,
-            pattern="duyet"
-        )
-    )
+    dp.add_handler(CallbackQueryHandler(callback))
 
     updater.start_polling()
 
-    print("BOT ĐANG CHẠY 24/24...")
+    print("BOT ĐANG CHẠY")
 
     updater.idle()
-
-# =========================
-# RUN
-# =========================
-
-keep_alive()
 
 main()
