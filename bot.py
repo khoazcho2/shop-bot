@@ -3,7 +3,7 @@ import time
 from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
 
-TOKEN = os.getenv("8462718923:AAFVPS1q92tr16czaextWLanU2HsPgZUPaQ")
+TOKEN = os.getenv("8462718923:AAEaghAn9KqEgvu-uUJJXMK0G51YZgk1Y1U")
 ADMIN_ID = int(os.getenv("8337495954"))
 
 waiting_ff = {}
