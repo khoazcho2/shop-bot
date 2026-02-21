@@ -1,7 +1,14 @@
 import os
 import time
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
 from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
+
+# =========================
+# CONFIG
+# =========================
 
 TOKEN = os.getenv("8462718923:AAEaghAn9KqEgvu-uUJJXMK0G51YZgk1Y1U")
 ADMIN_ID = int(os.getenv("8337495954"))
@@ -11,10 +18,33 @@ waiting_robux = {}
 waiting_username = {}
 
 last_payment_time = {}
-cooldown = 600
+
+SPAM_TIME = 600  # 10 phút
 
 
-# ========= START =========
+# =========================
+# WEB SERVER chống sleep Railway
+# =========================
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"BOT VIP ONLINE")
+
+
+def run_web():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), Handler)
+    server.serve_forever()
+
+
+threading.Thread(target=run_web).start()
+
+
+# =========================
+# START
+# =========================
 
 def start(update, context):
 
@@ -24,12 +54,14 @@ def start(update, context):
     ]
 
     update.message.reply_text(
-        "🏛 SHOP HỒ QUỐC 🏧\n\nChọn dịch vụ:",
+        "🔥 SHOP HỒ QUỐC VIP 🔥",
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
     )
 
 
-# ========= MENU ACC =========
+# =========================
+# MENU ACC
+# =========================
 
 def menu_ff(update, context):
 
@@ -45,11 +77,13 @@ def menu_ff(update, context):
     )
 
 
-# ========= CHỌN ACC =========
+# =========================
+# CHỌN ACC
+# =========================
 
 def chon_acc(update, context):
 
-    gia = update.message.text.replace("💰 ACC ","").replace("K","")
+    gia = update.message.text.replace("💰 ACC ", "").replace("K","")
 
     user_id = update.message.chat_id
 
@@ -58,7 +92,7 @@ def chon_acc(update, context):
     context.bot.send_photo(
         user_id,
         photo=open("qr.jpg","rb"),
-        caption=f"ACC {gia}K\n\nChuyển khoản rồi bấm ĐÃ THANH TOÁN"
+        caption="Chuyển khoản rồi bấm ĐÃ THANH TOÁN"
     )
 
     update.message.reply_text(
@@ -70,16 +104,18 @@ def chon_acc(update, context):
     )
 
 
-# ========= MENU ROBUX =========
+# =========================
+# MENU ROBUX
+# =========================
 
 def menu_robux(update, context):
 
     keyboard = [
-        ["💰 50K = 150 ROBUX"],
-        ["💰 100K = 300 ROBUX"],
-        ["💰 150K = 450 ROBUX"],
-        ["💰 500K = 1500 ROBUX"],
-        ["💰 1M = 3000 ROBUX"],
+        ["💰 50K"],
+        ["💰 100K"],
+        ["💰 200K"],
+        ["💰 500K"],
+        ["💰 1M"],
         ["⬅️ BACK"]
     ]
 
@@ -88,7 +124,7 @@ def menu_robux(update, context):
 
 50K = 150
 100K = 300
-150K = 450
+200K = 600
 500K = 1500
 1M = 3000
 """,
@@ -96,13 +132,13 @@ def menu_robux(update, context):
     )
 
 
-# ========= CHỌN ROBUX =========
+# =========================
+# CHỌN ROBUX
+# =========================
 
 def chon_robux(update, context):
 
-    text = update.message.text
-
-    gia = text.split("=")[0].replace("💰","").strip()
+    gia = update.message.text.replace("💰 ","")
 
     user_id = update.message.chat_id
 
@@ -111,7 +147,7 @@ def chon_robux(update, context):
     context.bot.send_photo(
         user_id,
         photo=open("qr.jpg","rb"),
-        caption=f"ROBUX {gia}\n\nChuyển khoản rồi bấm ĐÃ THANH TOÁN"
+        caption="Chuyển khoản rồi bấm ĐÃ THANH TOÁN"
     )
 
     update.message.reply_text(
@@ -123,27 +159,28 @@ def chon_robux(update, context):
     )
 
 
-# ========= THANH TOÁN =========
+# =========================
+# THANH TOÁN
+# =========================
 
 def thanhtoan(update, context):
 
     user_id = update.message.chat_id
-    user = update.message.from_user
 
     now = time.time()
 
     if user_id in last_payment_time:
 
-        remaining = cooldown - (now - last_payment_time[user_id])
-
-        if remaining > 0:
+        if now - last_payment_time[user_id] < SPAM_TIME:
 
             update.message.reply_text(
-                f"❌ Chống spam\nChờ {int(remaining//60)} phút"
+                "❌ Bạn đã bấm rồi. Vui lòng chờ 10 phút"
             )
             return
 
     last_payment_time[user_id] = now
+
+    user = update.message.from_user
 
 
     # ACC
@@ -153,15 +190,24 @@ def thanhtoan(update, context):
         gia = waiting_ff[user_id]
 
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton(
-                "DUYỆT ACC",
-                callback_data=f"duyet_acc|{user_id}|{gia}"
-            )]
+            [
+                InlineKeyboardButton(
+                    "DUYỆT ACC",
+                    callback_data=f"duyet_acc|{user_id}|{gia}"
+                )
+            ]
         ])
 
         context.bot.send_message(
             ADMIN_ID,
-            f"KHÁCH MUA ACC\n@{user.username}\nGói {gia}K",
+            f"""
+KHÁCH MUA ACC
+
+User: @{user.username}
+ID: {user_id}
+
+Gói: {gia}K
+""",
             reply_markup=keyboard
         )
 
@@ -177,7 +223,9 @@ def thanhtoan(update, context):
         update.message.reply_text("Nhập USERNAME ROBLOX:")
 
 
-# ========= USERNAME ROBUX =========
+# =========================
+# NHẬP USERNAME ROBLOX
+# =========================
 
 def username(update, context):
 
@@ -191,15 +239,23 @@ def username(update, context):
     gia = waiting_robux[user_id]
 
     keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton(
-            "DUYỆT ROBUX",
-            callback_data=f"duyet_robux|{user_id}|{gia}|{name}"
-        )]
+        [
+            InlineKeyboardButton(
+                "DUYỆT ROBUX",
+                callback_data=f"duyet_robux|{user_id}|{gia}|{name}"
+            )
+        ]
     ])
 
     context.bot.send_message(
         ADMIN_ID,
-        f"MUA ROBUX\nUsername: {name}\nGói: {gia}",
+        f"""
+KHÁCH MUA ROBUX
+
+Username: {name}
+
+Gói: {gia}
+""",
         reply_markup=keyboard
     )
 
@@ -208,7 +264,9 @@ def username(update, context):
     del waiting_username[user_id]
 
 
-# ========= CALLBACK =========
+# =========================
+# ADMIN DUYỆT
+# =========================
 
 def callback(update, context):
 
@@ -222,26 +280,45 @@ def callback(update, context):
     if data[0] == "duyet_acc":
 
         user_id = int(data[1])
+
         gia = data[2]
 
         file = f"acc_ff/{gia}.txt"
+
 
         if not os.path.exists(file):
 
             context.bot.send_message(user_id,"Hết acc")
             return
 
-        with open(file) as f:
+
+        with open(file,"r") as f:
+
             accs = f.readlines()
+
+
+        if len(accs) == 0:
+
+            context.bot.send_message(user_id,"Hết acc")
+            return
+
 
         acc = accs[0]
 
+
         with open(file,"w") as f:
+
             f.writelines(accs[1:])
 
-        context.bot.send_message(user_id,f"ACC:\n{acc}")
 
-        query.edit_message_text("Đã duyệt ACC")
+        context.bot.send_message(
+            user_id,
+            f"ACC CỦA BẠN:\n\n{acc}"
+        )
+
+
+        query.edit_message_text("ĐÃ DUYỆT ACC")
+
 
 
     # DUYỆT ROBUX
@@ -249,24 +326,38 @@ def callback(update, context):
     elif data[0] == "duyet_robux":
 
         user_id = int(data[1])
+
         gia = data[2]
-        name = data[3]
+
+        username = data[3]
+
 
         context.bot.send_message(
             user_id,
-            f"ROBUX ĐÃ DUYỆT\nUsername: {name}\nGói: {gia}"
+            f"""
+✅ ROBUX ĐÃ DUYỆT
+
+Username: {username}
+
+Sẽ nhận trong 120h
+"""
         )
 
-        query.edit_message_text("Đã duyệt ROBUX")
+
+        query.edit_message_text("ĐÃ DUYỆT ROBUX")
 
 
-# ========= MAIN =========
+
+# =========================
+# MAIN
+# =========================
 
 def main():
 
     updater = Updater(TOKEN)
 
     dp = updater.dispatcher
+
 
     dp.add_handler(CommandHandler("start", start))
 
@@ -276,7 +367,7 @@ def main():
 
     dp.add_handler(MessageHandler(Filters.regex("^💰 ACC"), chon_acc))
 
-    dp.add_handler(MessageHandler(Filters.regex(r"^\💰.*ROBUX"), chon_robux))
+    dp.add_handler(MessageHandler(Filters.regex("^💰"), chon_robux))
 
     dp.add_handler(MessageHandler(Filters.regex("ĐÃ THANH TOÁN"), thanhtoan))
 
@@ -284,9 +375,10 @@ def main():
 
     dp.add_handler(CallbackQueryHandler(callback))
 
+
     updater.start_polling()
 
-    print("BOT ONLINE")
+    print("BOT VIP ONLINE 24/24")
 
     updater.idle()
 
