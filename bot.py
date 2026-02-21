@@ -1,224 +1,267 @@
 import os
-import time
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
-
+import sqlite3
+from telegram import (
+Update,
+InlineKeyboardButton,
+InlineKeyboardMarkup,
+InputFile
+)
+from telegram.ext import (
+ApplicationBuilder,
+CommandHandler,
+CallbackQueryHandler,
+ContextTypes
+)
 TOKEN = "8462718923:AAEaghAn9KqEgvu-uUJJXMK0G51YZgk1YIU"
 ADMIN_ID = 8337495954
 
-cooldown = {}
-waiting = {}
+QR = "qr.png"
 
-COOLDOWN = 600
+# database
+conn = sqlite3.connect("shop.db", check_same_thread=False)
+cursor = conn.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS orders(
+user_id INTEGER,
+product TEXT,
+paid INTEGER DEFAULT 0
+)
+""")
+
+conn.commit()
 
 
-# ===== START =====
+# lay acc ff
+def get_acc(file):
 
-def start(update: Update, context: CallbackContext):
+    with open(file,"r") as f:
 
-    keyboard = [
+        accs=f.readlines()
 
-        [InlineKeyboardButton("🎮 Acc Free Fire 120K", callback_data="ff120")],
+    acc=accs[0]
 
-        [InlineKeyboardButton("💎 Robux 120H", callback_data="robux")],
+    with open(file,"w") as f:
+
+        f.writelines(accs[1:])
+
+    return acc
+
+
+# start
+async def start(update:Update,context:ContextTypes.DEFAULT_TYPE):
+
+    keyboard=[
+
+        [
+        InlineKeyboardButton("Mua Robux",callback_data="robux")
+        ],
+
+        [
+        InlineKeyboardButton("Mua Acc Free Fire",callback_data="ff")
+        ]
 
     ]
 
-    update.message.reply_text(
+    await update.message.reply_text(
 
-        "🔥 SHOP HỒ QUỐC 🔥",
+    "Shop Ho Quoc",
 
-        reply_markup=InlineKeyboardMarkup(keyboard)
+    reply_markup=InlineKeyboardMarkup(keyboard)
 
     )
 
 
-# ===== BUTTON =====
+# chon san pham
+async def button(update:Update,context):
 
-def button(update: Update, context: CallbackContext):
+    query=update.callback_query
 
-    query = update.callback_query
-    query.answer()
+    user=query.from_user.id
 
-    user = query.from_user
-
-
-# ===== ACC FF =====
-
-    if query.data == "ff120":
-
-        send_qr(query, context, "ACC FREE FIRE 120K")
+    data=query.data
 
 
-# ===== MENU ROBUX =====
+    if data=="robux":
 
-    elif query.data == "robux":
+        keyboard=[
 
-        keyboard = [
-
-            [InlineKeyboardButton("50K = 150 Robux", callback_data="rb50")],
-
-            [InlineKeyboardButton("100K = 300 Robux", callback_data="rb100")],
-
-            [InlineKeyboardButton("200K = 600 Robux", callback_data="rb200")],
-
-            [InlineKeyboardButton("500K = 1500 Robux", callback_data="rb500")],
-
-            [InlineKeyboardButton("1M = 3000 Robux", callback_data="rb1m")],
+        [
+        InlineKeyboardButton("120 Robux = 50k",callback_data="buy_robux")
+        ]
 
         ]
 
-        query.message.reply_text(
+        await query.message.reply_text(
 
-            "💎 ROBUX 120H (ĐÃ THUẾ)",
+        "Chon goi robux",
 
-            reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=InlineKeyboardMarkup(keyboard)
 
         )
 
 
-# ===== ROBUX OPTIONS =====
+    elif data=="ff":
 
-    elif query.data == "rb50":
+        keyboard=[
 
-        send_qr(query, context, "150 ROBUX (50K)")
+        [
+        InlineKeyboardButton("Acc Free Fire 120k",callback_data="buy_ff")
+        ]
 
+        ]
 
-    elif query.data == "rb100":
+        await query.message.reply_text(
 
-        send_qr(query, context, "300 ROBUX (100K)")
+        "Acc random",
 
+        reply_markup=InlineKeyboardMarkup(keyboard)
 
-    elif query.data == "rb200":
-
-        send_qr(query, context, "600 ROBUX (200K)")
-
-
-    elif query.data == "rb500":
-
-        send_qr(query, context, "1500 ROBUX (500K)")
+        )
 
 
-    elif query.data == "rb1m":
+    elif data=="buy_ff" or data=="buy_robux":
 
-        send_qr(query, context, "3000 ROBUX (1M)")
+        cursor.execute(
+
+        "SELECT paid FROM orders WHERE user_id=?",
+
+        (user,)
+        )
+
+        check=cursor.fetchone()
 
 
-# ===== PAID =====
+        if check and check[0]==1:
 
-    elif query.data == "paid":
-
-        now = time.time()
-
-        if user.id in cooldown and now - cooldown[user.id] < COOLDOWN:
-
-            query.message.reply_text("⛔ Chờ 10 phút rồi thử lại")
+            await query.answer("Ban da mua roi")
             return
 
 
-        cooldown[user.id] = now
-        waiting[user.id] = True
+        product="ff" if data=="buy_ff" else "robux"
 
 
-        query.message.reply_text(
+        cursor.execute(
 
-            "✅ Đã gửi\n⏳ Chờ admin duyệt"
+        "INSERT OR REPLACE INTO orders(user_id,product,paid) VALUES(?,?,0)",
+
+        (user,product)
 
         )
 
+        conn.commit()
 
-        keyboard = [
 
-            [InlineKeyboardButton("DUYỆT", callback_data=f"approve_{user.id}")]
+        keyboard=[
+
+        [
+        InlineKeyboardButton("Da thanh toan",callback_data="paid")
+        ]
 
         ]
 
 
-        context.bot.send_message(
+        await query.message.reply_photo(
 
-            ADMIN_ID,
+        photo=InputFile(QR),
 
-            f"""
+        caption="Quet QR roi bam da thanh toan",
 
-KHÁCH ĐÃ THANH TOÁN
-
-User: @{user.username}
-
-ID: {user.id}
-
-""",
-
-            reply_markup=InlineKeyboardMarkup(keyboard)
+        reply_markup=InlineKeyboardMarkup(keyboard)
 
         )
 
 
-# ===== ADMIN DUYỆT =====
+    elif data=="paid":
 
-    elif query.data.startswith("approve_"):
+        cursor.execute(
 
-        if query.from_user.id != ADMIN_ID:
-            return
+        "UPDATE orders SET paid=1 WHERE user_id=?",
+
+        (user,)
+        )
+
+        conn.commit()
 
 
-        uid = int(query.data.split("_")[1])
+        keyboard=[
+
+        [
+        InlineKeyboardButton(
+
+        "DUYET",
+
+        callback_data=f"duyet_{user}"
+
+        )
+
+        ]
+
+        ]
 
 
-        if uid in waiting:
+        await context.bot.send_message(
 
-            context.bot.send_message(
+        ADMIN_ID,
 
-                uid,
+        f"user {user} da thanh toan",
 
-                "🎉 Đã duyệt thành công\nRobux sẽ vào sau 120H"
+        reply_markup=InlineKeyboardMarkup(keyboard)
+
+        )
+
+
+        await query.answer("Cho admin duyet")
+
+
+    elif data.startswith("duyet"):
+
+        user=int(data.split("_")[1])
+
+
+        cursor.execute(
+
+        "SELECT product FROM orders WHERE user_id=?",
+
+        (user,)
+        )
+
+        product=cursor.fetchone()[0]
+
+
+        if product=="ff":
+
+            acc=get_acc("acc.txt")
+
+            await context.bot.send_message(
+
+            user,
+
+            f"ACC FREE FIRE:\n{acc}"
 
             )
 
-            del waiting[uid]
 
-            query.message.reply_text("ĐÃ DUYỆT")
+        elif product=="robux":
 
+            await context.bot.send_message(
 
-# ===== SEND QR =====
+            user,
 
-def send_qr(query, context, text):
+            "Admin se nap robux cho ban"
 
-    keyboard = [
-
-        [InlineKeyboardButton("✅ Đã thanh toán", callback_data="paid")]
-
-    ]
-
-    context.bot.send_photo(
-
-        query.message.chat_id,
-
-        photo=open("qr.jpg", "rb"),
-
-        caption=text,
-
-        reply_markup=InlineKeyboardMarkup(keyboard)
-
-    )
+            )
 
 
-# ===== MAIN =====
-
-def main():
-
-    updater = Updater(TOKEN)
-
-    dp = updater.dispatcher
-
-    dp.add_handler(CommandHandler("start", start))
-
-    dp.add_handler(CallbackQueryHandler(button))
-
-    updater.start_polling()
-
-    updater.idle()
+        await query.answer("Da duyet")
 
 
-main()
+# run
+app=ApplicationBuilder().token(TOKEN).build()
 
+app.add_handler(CommandHandler("start",start))
+
+app.add_handler(CallbackQueryHandler(button))
+
+app.run_polling()
 
