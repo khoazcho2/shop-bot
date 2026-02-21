@@ -1,356 +1,208 @@
 import os
 import time
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-
-from telegram import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler
-
-# =========================
-# CONFIG
-# =========================
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
 
 TOKEN = os.getenv("8462718923:AAEaghAn9KqEgvu-uUJJXMK0G51YZgk1Y1U")
 ADMIN_ID = int(os.getenv("8337495954"))
 
-waiting_ff = {}
-waiting_robux = {}
-waiting_username = {}
+cooldown = {}
+waiting = {}
 
-last_payment_time = {}
-
-SPAM_TIME = 600  # 10 phút
+COOLDOWN = 600
 
 
-# =========================
-# WEB SERVER chống sleep Railway
-# =========================
+# ===== START =====
 
-class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"BOT VIP ONLINE")
-
-
-def run_web():
-    port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(("0.0.0.0", port), Handler)
-    server.serve_forever()
-
-
-threading.Thread(target=run_web).start()
-
-
-# =========================
-# START
-# =========================
-
-def start(update, context):
+def start(update: Update, context: CallbackContext):
 
     keyboard = [
-        ["🎮 ACC FREE FIRE"],
-        ["💎 ROBUX 120H"]
+
+        [InlineKeyboardButton("🎮 Acc Free Fire 120K", callback_data="ff120")],
+
+        [InlineKeyboardButton("💎 Robux 120H", callback_data="robux")],
+
     ]
 
     update.message.reply_text(
-        "🔥 SHOP HỒ QUỐC VIP 🔥",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+
+        "🔥 SHOP HỒ QUỐC 🔥",
+
+        reply_markup=InlineKeyboardMarkup(keyboard)
+
     )
 
 
-# =========================
-# MENU ACC
-# =========================
+# ===== BUTTON =====
 
-def menu_ff(update, context):
-
-    keyboard = [
-        ["💰 ACC 120K"],
-        ["💰 ACC 200K"],
-        ["⬅️ BACK"]
-    ]
-
-    update.message.reply_text(
-        "Chọn ACC:",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
-
-
-# =========================
-# CHỌN ACC
-# =========================
-
-def chon_acc(update, context):
-
-    gia = update.message.text.replace("💰 ACC ", "").replace("K","")
-
-    user_id = update.message.chat_id
-
-    waiting_ff[user_id] = gia
-
-    context.bot.send_photo(
-        user_id,
-        photo=open("qr.jpg","rb"),
-        caption="Chuyển khoản rồi bấm ĐÃ THANH TOÁN"
-    )
-
-    update.message.reply_text(
-        "Sau khi chuyển bấm:",
-        reply_markup=ReplyKeyboardMarkup(
-            [["✅ ĐÃ THANH TOÁN"]],
-            resize_keyboard=True
-        )
-    )
-
-
-# =========================
-# MENU ROBUX
-# =========================
-
-def menu_robux(update, context):
-
-    keyboard = [
-        ["💰 50K"],
-        ["💰 100K"],
-        ["💰 200K"],
-        ["💰 500K"],
-        ["💰 1M"],
-        ["⬅️ BACK"]
-    ]
-
-    update.message.reply_text(
-"""💎 ROBUX 120H
-
-50K = 150
-100K = 300
-200K = 600
-500K = 1500
-1M = 3000
-""",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    )
-
-
-# =========================
-# CHỌN ROBUX
-# =========================
-
-def chon_robux(update, context):
-
-    gia = update.message.text.replace("💰 ","")
-
-    user_id = update.message.chat_id
-
-    waiting_robux[user_id] = gia
-
-    context.bot.send_photo(
-        user_id,
-        photo=open("qr.jpg","rb"),
-        caption="Chuyển khoản rồi bấm ĐÃ THANH TOÁN"
-    )
-
-    update.message.reply_text(
-        "Sau khi chuyển bấm:",
-        reply_markup=ReplyKeyboardMarkup(
-            [["✅ ĐÃ THANH TOÁN"]],
-            resize_keyboard=True
-        )
-    )
-
-
-# =========================
-# THANH TOÁN
-# =========================
-
-def thanhtoan(update, context):
-
-    user_id = update.message.chat_id
-
-    now = time.time()
-
-    if user_id in last_payment_time:
-
-        if now - last_payment_time[user_id] < SPAM_TIME:
-
-            update.message.reply_text(
-                "❌ Bạn đã bấm rồi. Vui lòng chờ 10 phút"
-            )
-            return
-
-    last_payment_time[user_id] = now
-
-    user = update.message.from_user
-
-
-    # ACC
-
-    if user_id in waiting_ff:
-
-        gia = waiting_ff[user_id]
-
-        keyboard = InlineKeyboardMarkup([
-            [
-                InlineKeyboardButton(
-                    "DUYỆT ACC",
-                    callback_data=f"duyet_acc|{user_id}|{gia}"
-                )
-            ]
-        ])
-
-        context.bot.send_message(
-            ADMIN_ID,
-            f"""
-KHÁCH MUA ACC
-
-User: @{user.username}
-ID: {user_id}
-
-Gói: {gia}K
-""",
-            reply_markup=keyboard
-        )
-
-        update.message.reply_text("Chờ admin duyệt")
-
-
-    # ROBUX
-
-    elif user_id in waiting_robux:
-
-        waiting_username[user_id] = True
-
-        update.message.reply_text("Nhập USERNAME ROBLOX:")
-
-
-# =========================
-# NHẬP USERNAME ROBLOX
-# =========================
-
-def username(update, context):
-
-    user_id = update.message.chat_id
-
-    if user_id not in waiting_username:
-        return
-
-    name = update.message.text
-
-    gia = waiting_robux[user_id]
-
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton(
-                "DUYỆT ROBUX",
-                callback_data=f"duyet_robux|{user_id}|{gia}|{name}"
-            )
-        ]
-    ])
-
-    context.bot.send_message(
-        ADMIN_ID,
-        f"""
-KHÁCH MUA ROBUX
-
-Username: {name}
-
-Gói: {gia}
-""",
-        reply_markup=keyboard
-    )
-
-    update.message.reply_text("Chờ admin duyệt")
-
-    del waiting_username[user_id]
-
-
-# =========================
-# ADMIN DUYỆT
-# =========================
-
-def callback(update, context):
+def button(update: Update, context: CallbackContext):
 
     query = update.callback_query
+    query.answer()
 
-    data = query.data.split("|")
-
-
-    # DUYỆT ACC
-
-    if data[0] == "duyet_acc":
-
-        user_id = int(data[1])
-
-        gia = data[2]
-
-        file = f"acc_ff/{gia}.txt"
+    user = query.from_user
 
 
-        if not os.path.exists(file):
+# ===== ACC FF =====
 
-            context.bot.send_message(user_id,"Hết acc")
-            return
+    if query.data == "ff120":
 
-
-        with open(file,"r") as f:
-
-            accs = f.readlines()
+        send_qr(query, context, "ACC FREE FIRE 120K")
 
 
-        if len(accs) == 0:
+# ===== MENU ROBUX =====
 
-            context.bot.send_message(user_id,"Hết acc")
-            return
+    elif query.data == "robux":
 
+        keyboard = [
 
-        acc = accs[0]
+            [InlineKeyboardButton("50K = 150 Robux", callback_data="rb50")],
 
+            [InlineKeyboardButton("100K = 300 Robux", callback_data="rb100")],
 
-        with open(file,"w") as f:
+            [InlineKeyboardButton("200K = 600 Robux", callback_data="rb200")],
 
-            f.writelines(accs[1:])
+            [InlineKeyboardButton("500K = 1500 Robux", callback_data="rb500")],
 
+            [InlineKeyboardButton("1M = 3000 Robux", callback_data="rb1m")],
 
-        context.bot.send_message(
-            user_id,
-            f"ACC CỦA BẠN:\n\n{acc}"
+        ]
+
+        query.message.reply_text(
+
+            "💎 ROBUX 120H (ĐÃ THUẾ)",
+
+            reply_markup=InlineKeyboardMarkup(keyboard)
+
         )
 
 
-        query.edit_message_text("ĐÃ DUYỆT ACC")
+# ===== ROBUX OPTIONS =====
+
+    elif query.data == "rb50":
+
+        send_qr(query, context, "150 ROBUX (50K)")
 
 
+    elif query.data == "rb100":
 
-    # DUYỆT ROBUX
+        send_qr(query, context, "300 ROBUX (100K)")
 
-    elif data[0] == "duyet_robux":
 
-        user_id = int(data[1])
+    elif query.data == "rb200":
 
-        gia = data[2]
+        send_qr(query, context, "600 ROBUX (200K)")
 
-        username = data[3]
+
+    elif query.data == "rb500":
+
+        send_qr(query, context, "1500 ROBUX (500K)")
+
+
+    elif query.data == "rb1m":
+
+        send_qr(query, context, "3000 ROBUX (1M)")
+
+
+# ===== PAID =====
+
+    elif query.data == "paid":
+
+        now = time.time()
+
+        if user.id in cooldown and now - cooldown[user.id] < COOLDOWN:
+
+            query.message.reply_text("⛔ Chờ 10 phút rồi thử lại")
+            return
+
+
+        cooldown[user.id] = now
+        waiting[user.id] = True
+
+
+        query.message.reply_text(
+
+            "✅ Đã gửi\n⏳ Chờ admin duyệt"
+
+        )
+
+
+        keyboard = [
+
+            [InlineKeyboardButton("DUYỆT", callback_data=f"approve_{user.id}")]
+
+        ]
 
 
         context.bot.send_message(
-            user_id,
+
+            ADMIN_ID,
+
             f"""
-✅ ROBUX ĐÃ DUYỆT
 
-Username: {username}
+KHÁCH ĐÃ THANH TOÁN
 
-Sẽ nhận trong 120h
-"""
+User: @{user.username}
+
+ID: {user.id}
+
+""",
+
+            reply_markup=InlineKeyboardMarkup(keyboard)
+
         )
 
 
-        query.edit_message_text("ĐÃ DUYỆT ROBUX")
+# ===== ADMIN DUYỆT =====
+
+    elif query.data.startswith("approve_"):
+
+        if query.from_user.id != ADMIN_ID:
+            return
 
 
+        uid = int(query.data.split("_")[1])
 
-# =========================
-# MAIN
-# =========================
+
+        if uid in waiting:
+
+            context.bot.send_message(
+
+                uid,
+
+                "🎉 Đã duyệt thành công\nRobux sẽ vào sau 120H"
+
+            )
+
+            del waiting[uid]
+
+            query.message.reply_text("ĐÃ DUYỆT")
+
+
+# ===== SEND QR =====
+
+def send_qr(query, context, text):
+
+    keyboard = [
+
+        [InlineKeyboardButton("✅ Đã thanh toán", callback_data="paid")]
+
+    ]
+
+    context.bot.send_photo(
+
+        query.message.chat_id,
+
+        photo=open("qr.jpg", "rb"),
+
+        caption=text,
+
+        reply_markup=InlineKeyboardMarkup(keyboard)
+
+    )
+
+
+# ===== MAIN =====
 
 def main():
 
@@ -358,30 +210,15 @@ def main():
 
     dp = updater.dispatcher
 
-
     dp.add_handler(CommandHandler("start", start))
 
-    dp.add_handler(MessageHandler(Filters.regex("ACC FREE FIRE"), menu_ff))
-
-    dp.add_handler(MessageHandler(Filters.regex("ROBUX"), menu_robux))
-
-    dp.add_handler(MessageHandler(Filters.regex("^💰 ACC"), chon_acc))
-
-    dp.add_handler(MessageHandler(Filters.regex("^💰"), chon_robux))
-
-    dp.add_handler(MessageHandler(Filters.regex("ĐÃ THANH TOÁN"), thanhtoan))
-
-    dp.add_handler(MessageHandler(Filters.text, username))
-
-    dp.add_handler(CallbackQueryHandler(callback))
-
+    dp.add_handler(CallbackQueryHandler(button))
 
     updater.start_polling()
-
-    print("BOT VIP ONLINE 24/24")
 
     updater.idle()
 
 
 main()
+
 
