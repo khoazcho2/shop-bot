@@ -3,8 +3,8 @@ import time
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
 
-TOKEN = os.getenv("8462718923:AAEaghAn9KqEgvu-uUJJXMK0G51YZgk1Y1U")
-ADMIN_ID = int(os.getenv("8337495954"))
+TOKEN = 8462718923:AAEaghAn9KqEgvu-uUJJXMK0G51YZgk1Y1U
+ADMIN_ID = 8337495954
 
 cooldown = {}
 waiting = {}
