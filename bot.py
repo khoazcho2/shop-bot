@@ -3,7 +3,7 @@ import time
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
 
-TOKEN = 8462718923:AAEaghAn9KqEgvu-uUJJXMK0G51YZgk1Y1U
+TOKEN = "8462718923:AAEaghAn9KqEgvu-uUJJXMK0G51YZgk1Y1U"
 ADMIN_ID = 8337495954
 
 cooldown = {}
