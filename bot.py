@@ -13,6 +13,8 @@ from telegram.ext import (
     ContextTypes
 )
 
+import os
+
 TOKEN = os.getenv("8462718923:AAEmsMjDI4Ih0IkKkcrnqaIXTIxNVEd68xs")
 ADMIN_ID = int(os.getenv("8337495954"))
 
