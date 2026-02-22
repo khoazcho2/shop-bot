@@ -14,7 +14,7 @@ from telegram.ext import (
 )
 
 TOKEN = os.getenv("8462718923:AAEmsMjDI4Ih0IkKkcrnqaIXTIxNVEd68xs")
-ADMIN_ID = 8337495954
+ADMIN_ID = int(os.getenv("8337495954"))
 
 QR = "qr.png"
 DATA = "data.json"
