@@ -12,7 +12,7 @@ CommandHandler,
 CallbackQueryHandler,
 ContextTypes
 )
-TOKEN = "8462718923:AAEaghAn9KqEgvu-uUJJXMK0G51YZgk1Y1U"
+TOKEN = "8462718923:AAEmsMjDI4Ih0IkKkcrnqaIXTIxNVEd68xs"
 ADMIN_ID = 8337495954
 
 QR = "qr.png"
