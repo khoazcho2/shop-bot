@@ -1,147 +1,239 @@
 import os
-from aiogram import Bot, Dispatcher, types, executor
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
+from aiogram.utils import executor
 
+
+# Railway Variables
 TOKEN = os.getenv("TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
-# link QR ngân hàng của bạn
-QR_LINK = "https://i.imgur.com/yourQR.png"
+
+# file QR
+QR_PATH = "qr.jpg"
 
 
-# MENU CHÍNH
+# lưu dữ liệu
+choosing = {}
+pending = {}
+
+# chống spam
+paid_users = set()
+
+
+
+# START
 @dp.message_handler(commands=['start'])
 async def start(msg: types.Message):
 
-    kb = InlineKeyboardMarkup(row_width=1)
+    kb = InlineKeyboardMarkup()
 
     kb.add(
-        InlineKeyboardButton("🟢 MUA ROBUX", callback_data="robux"),
-        InlineKeyboardButton("🔵 MUA FREE FIRE", callback_data="ff")
+        InlineKeyboardButton("💎 MUA ROBUX", callback_data="robux")
     )
 
-    await msg.answer("✨ SHOP HỒ QUỐC ✨\nChọn sản phẩm:", reply_markup=kb)
+    await msg.answer(
+        "🏪 SHOP HỒ QUỐC 🏪\n\n"
+        "💎 Robux chính hãng\n"
+        "🛡 Uy tín - An toàn\n\n"
+        "👇 Chọn bên dưới",
+        reply_markup=kb
+    )
 
 
-# ROBUX MENU
+
+# MENU ROBUX
 @dp.callback_query_handler(lambda c: c.data == "robux")
 async def robux(call: types.CallbackQuery):
 
     kb = InlineKeyboardMarkup(row_width=1)
 
     kb.add(
-        InlineKeyboardButton("💰 150 Robux - 50k", callback_data="buy_150"),
-        InlineKeyboardButton("💰 300 Robux - 100k", callback_data="buy_300")
+
+        InlineKeyboardButton("💎 150 Robux - 50K", callback_data="150"),
+
+        InlineKeyboardButton("💎 300 Robux - 100K", callback_data="300"),
+
+        InlineKeyboardButton("💎 600 Robux - 200K", callback_data="600"),
+
+        InlineKeyboardButton("💎 900 Robux - 300K", callback_data="900"),
+
+        InlineKeyboardButton("💎 1200 Robux - 400K", callback_data="1200"),
+
+        InlineKeyboardButton("💎 1500 Robux - 500K", callback_data="1500")
+
     )
 
-    await call.message.edit_text("Chọn gói Robux:", reply_markup=kb)
-
-
-# FREE FIRE MENU
-@dp.callback_query_handler(lambda c: c.data == "ff")
-async def ff(call: types.CallbackQuery):
-
-    kb = InlineKeyboardMarkup(row_width=1)
-
-    kb.add(
-        InlineKeyboardButton("💎 566 KC - 100k", callback_data="buy_ff566"),
-        InlineKeyboardButton("💎 3113 KC - 550k", callback_data="buy_ff3113")
+    await call.message.answer(
+        "📦 Chọn gói Robux:",
+        reply_markup=kb
     )
 
-    await call.message.edit_text("Chọn gói Free Fire:", reply_markup=kb)
 
 
-# NHẬP TÊN
-user_data = {}
+# CHỌN GÓI
+@dp.callback_query_handler(lambda c: c.data in ["150","300","600","900","1200","1500"])
+async def buy(call: types.CallbackQuery):
+
+    choosing[call.from_user.id] = call.data
+
+    await call.message.answer(
+        "👤 Nhập tên tài khoản Roblox:"
+    )
 
 
-@dp.callback_query_handler(lambda c: "buy" in c.data)
-async def ask_user(call: types.CallbackQuery):
 
-    user_data[call.from_user.id] = call.data
-
-    await bot.send_message(call.from_user.id, "Nhập tên tài khoản:")
-
-
-# NHẬN TÊN
+# NHẬP USERNAME → gửi QR
 @dp.message_handler()
-async def get_name(msg: types.Message):
+async def get_username(msg: types.Message):
 
-    if msg.from_user.id not in user_data:
+    user_id = msg.from_user.id
+
+    if user_id not in choosing:
         return
 
-    product = user_data[msg.from_user.id]
     username = msg.text
+    robux = choosing[user_id]
 
-    # gửi QR cho khách
+    pending[user_id] = (username, robux)
+
     kb = InlineKeyboardMarkup()
 
     kb.add(
-        InlineKeyboardButton("✅ ĐÃ THANH TOÁN", callback_data=f"paid_{username}_{product}")
+        InlineKeyboardButton("✅ ĐÃ THANH TOÁN", callback_data="paid")
     )
 
-    await msg.answer_photo(QR_LINK,
-        caption=f"Thanh toán xong bấm nút dưới\nTên: {username}",
+    photo = InputFile(QR_PATH)
+
+    await msg.answer_photo(
+
+        photo,
+
+        caption=f"""
+💳 Quét QR để thanh toán
+
+👤 Roblox: {username}
+💎 Gói: {robux} Robux
+
+Sau khi chuyển bấm nút dưới
+""",
+
         reply_markup=kb
     )
 
 
-# XÁC NHẬN THANH TOÁN
-@dp.callback_query_handler(lambda c: "paid" in c.data)
+
+# USER BẤM ĐÃ THANH TOÁN
+@dp.callback_query_handler(lambda c: c.data == "paid")
 async def paid(call: types.CallbackQuery):
 
-    data = call.data.replace("paid_", "")
+    user_id = call.from_user.id
 
-    username, product = data.split("_", 1)
+
+    # chống spam
+    if user_id in paid_users:
+
+        await call.answer(
+            "⚠️ Bạn đã gửi yêu cầu rồi!",
+            show_alert=True
+        )
+
+        return
+
+
+    paid_users.add(user_id)
+
+
+    username, robux = pending[user_id]
+
 
     kb = InlineKeyboardMarkup()
 
     kb.add(
-        InlineKeyboardButton("✅ DUYỆT", callback_data=f"ok_{call.from_user.id}"),
-        InlineKeyboardButton("❌ HỦY", callback_data=f"no_{call.from_user.id}")
+
+        InlineKeyboardButton("✅ DUYỆT", callback_data=f"ok_{user_id}"),
+
+        InlineKeyboardButton("❌ HỦY", callback_data=f"no_{user_id}")
+
     )
 
+
     await bot.send_message(
+
         ADMIN_ID,
+
         f"""
-ĐƠN MỚI
+🛒 ĐƠN MUA ROBUX
 
-User: @{call.from_user.username}
+👤 ID: {user_id}
 
-Tên game: {username}
+🎮 Roblox: {username}
 
-Gói: {product}
+💎 Gói: {robux} Robux
 """,
+
         reply_markup=kb
     )
 
-    await call.message.answer("⏳ Chờ admin duyệt")
+
+    await call.message.answer(
+        "⏳ Đã gửi admin duyệt"
+    )
+
 
 
 # ADMIN DUYỆT
-@dp.callback_query_handler(lambda c: "ok" in c.data)
+@dp.callback_query_handler(lambda c: c.data.startswith("ok_"))
 async def ok(call: types.CallbackQuery):
 
     user_id = int(call.data.split("_")[1])
 
-    await bot.send_message(user_id, "✅ Đã duyệt - sẽ gửi sớm")
+    paid_users.discard(user_id)
 
-    await call.message.edit_text("ĐÃ DUYỆT")
+
+    await bot.send_message(
+
+        user_id,
+
+        "🎉 Thanh toán thành công\n"
+        "💎 Robux sẽ được gửi sớm\n"
+        "Cảm ơn bạn ❤️"
+
+    )
+
+
+    await call.message.edit_text("✅ ĐÃ DUYỆT")
+
 
 
 # ADMIN HỦY
-@dp.callback_query_handler(lambda c: "no" in c.data)
+@dp.callback_query_handler(lambda c: c.data.startswith("no_"))
 async def no(call: types.CallbackQuery):
 
     user_id = int(call.data.split("_")[1])
 
-    await bot.send_message(user_id, "❌ Đơn bị hủy")
-
-    await call.message.edit_text("ĐÃ HỦY")
+    paid_users.discard(user_id)
 
 
-# START BOT
-executor.start_polling(dp)
+    await bot.send_message(
+
+        user_id,
+
+        "❌ Thanh toán bị từ chối"
+
+    )
+
+
+    await call.message.edit_text("❌ ĐÃ HỦY")
+
+
+
+# RUN BOT
+if __name__ == "__main__":
+
+    print("Bot is running...")
+
+    executor.start_polling(dp, skip_updates=True)
