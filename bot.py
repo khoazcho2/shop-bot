@@ -15,9 +15,9 @@ from telegram.ext import (
 )
 import os
 
-TOKEN = os.getenv("8462718923:AAEmsMjDI4Ih0IkKkcrnqaIXTIxNVEd68xs")
+TOKEN = os.getenv("TOKEN")
 
-ADMIN_ID = int(os.getenv("8337495954"))
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
 
 QR = "https://i.imgur.com/yourQR.png"
