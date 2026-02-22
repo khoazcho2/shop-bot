@@ -1,420 +1,191 @@
 import os
-from telegram import (
-    Update,
-    ReplyKeyboardMarkup,
-    InlineKeyboardMarkup,
-    InlineKeyboardButton
-)
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-    filters
-)
-import os
+import logging
+from aiogram import Bot, Dispatcher, types, executor
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.getenv("TOKEN")
-
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 
+bot = Bot(token=TOKEN)
+dp = Dispatcher(bot)
 
-QR = "https://i.imgur.com/yourQR.png"
-
-# lưu trạng thái
-waiting_ff = set()
-waiting_robux = {}
-waiting_name = {}
-
-# =====================
-# LOAD ACC FF
-# =====================
-
-def load_ff():
-
-    if not os.path.exists("ff.txt"):
-        return []
-
-    with open("ff.txt","r",encoding="utf8") as f:
-        return f.read().splitlines()
+# ===== QR IMAGE =====
+QR_URL = "https://i.imgur.com/yourQR.png"
 
 
-def save_ff(acc):
+# ===== START =====
 
-    with open("ff.txt","w",encoding="utf8") as f:
-        f.write("\n".join(acc))
+@dp.message_handler(commands=['start'])
+async def start(message: types.Message):
 
+    kb = InlineKeyboardMarkup(row_width=2)
 
-# =====================
-# START
-# =====================
-
-async def start(update: Update, context):
-
-    keyboard = ReplyKeyboardMarkup(
-
-        [
-            ["🔥 ACC FREE FIRE 120K"],
-            ["🪙 MUA ROBUX"]
-        ],
-
-        resize_keyboard=True
-
+    kb.add(
+        InlineKeyboardButton("🟢 MUA ROBUX", callback_data="robux"),
+        InlineKeyboardButton("🔵 MUA FREE FIRE", callback_data="ff")
     )
 
-    await update.message.reply_text(
-
+    await message.answer(
         "✨ SHOP HỒ QUỐC ✨\n\nChọn sản phẩm:",
-
-        reply_markup=keyboard
-
+        reply_markup=kb
     )
 
 
-# =====================
-# MENU FF
-# =====================
+# ===== ROBUX PACK =====
 
-async def freefire(update, context):
+@dp.callback_query_handler(lambda c: c.data == "robux")
+async def robux(callback: types.CallbackQuery):
 
-    keyboard = InlineKeyboardMarkup([
+    kb = InlineKeyboardMarkup()
 
-        [InlineKeyboardButton("💳 THANH TOÁN", callback_data="pay_ff")]
+    kb.add(
+        InlineKeyboardButton("120 Robux - 20k", callback_data="rb_120"),
+        InlineKeyboardButton("400 Robux - 60k", callback_data="rb_400"),
+        InlineKeyboardButton("800 Robux - 120k", callback_data="rb_800")
+    )
 
-    ])
-
-    await update.message.reply_text(
-
-        "🔥 ACC FREE FIRE\n💰 Giá: 120K",
-
-        reply_markup=keyboard
-
+    await callback.message.edit_text(
+        "Chọn gói Robux:",
+        reply_markup=kb
     )
 
 
-# =====================
-# MENU ROBUX
-# =====================
+# ===== FF PACK =====
 
-async def robux(update, context):
+@dp.callback_query_handler(lambda c: c.data == "ff")
+async def ff(callback: types.CallbackQuery):
 
-    keyboard = InlineKeyboardMarkup([
+    kb = InlineKeyboardMarkup()
 
-        [InlineKeyboardButton("💎 150 Robux — 50K", callback_data="rb_150")],
+    kb.add(
+        InlineKeyboardButton("120 KC - 20k", callback_data="ff_120"),
+        InlineKeyboardButton("310 KC - 50k", callback_data="ff_310"),
+        InlineKeyboardButton("520 KC - 80k", callback_data="ff_520")
+    )
 
-        [InlineKeyboardButton("💎 300 Robux — 100K", callback_data="rb_300")],
-
-        [InlineKeyboardButton("💎 600 Robux — 200K", callback_data="rb_600")],
-
-        [InlineKeyboardButton("💎 1200 Robux — 400K", callback_data="rb_1200")],
-
-        [InlineKeyboardButton("💎 1500 Robux — 500K", callback_data="rb_1500")]
-
-    ])
-
-    await update.message.reply_text(
-
-        "🪙 CHỌN GÓI ROBUX:",
-
-        reply_markup=keyboard
-
+    await callback.message.edit_text(
+        "Chọn gói Free Fire:",
+        reply_markup=kb
     )
 
 
-# =====================
-# BUTTON
-# =====================
+# ===== USERNAME INPUT =====
 
-async def button(update, context):
+user_data = {}
 
-    query = update.callback_query
+@dp.callback_query_handler(lambda c: c.data.startswith("rb_") or c.data.startswith("ff_"))
+async def ask_user(callback: types.CallbackQuery):
 
-    await query.answer()
+    user_data[callback.from_user.id] = callback.data
 
-    user = query.from_user
+    await bot.send_message(
+        callback.from_user.id,
+        "Nhập username game:"
+    )
 
 
-# =====================
-# PAY FF
-# =====================
+@dp.message_handler(lambda message: message.from_user.id in user_data)
+async def get_username(message: types.Message):
 
-    if query.data == "pay_ff":
+    pack = user_data[message.from_user.id]
+    username = message.text
 
-        waiting_ff.add(user.id)
+    kb = InlineKeyboardMarkup()
 
-        keyboard = InlineKeyboardMarkup([
-
-            [InlineKeyboardButton("✅ ĐÃ THANH TOÁN", callback_data="done_ff")]
-
-        ])
-
-        await context.bot.send_photo(
-
-            user.id,
-
-            QR,
-
-            caption="💳 Quét QR rồi bấm nút dưới",
-
-            reply_markup=keyboard
-
+    kb.add(
+        InlineKeyboardButton(
+            "💳 THANH TOÁN",
+            callback_data=f"pay|{pack}|{username}"
         )
+    )
+
+    await message.answer(
+        f"Gói: {pack}\nUser: {username}",
+        reply_markup=kb
+    )
+
+    del user_data[message.from_user.id]
 
 
-# =====================
-# DONE FF
-# =====================
+# ===== PAYMENT =====
 
-    elif query.data == "done_ff":
+@dp.callback_query_handler(lambda c: c.data.startswith("pay"))
+async def payment(callback: types.CallbackQuery):
 
-        if user.id not in waiting_ff:
-            return
+    data = callback.data.split("|")
 
+    pack = data[1]
+    username = data[2]
+    user_id = callback.from_user.id
 
-        keyboard = InlineKeyboardMarkup([
+    # gửi QR cho user
+    await bot.send_photo(
+        user_id,
+        QR_URL,
+        caption="Quét QR để thanh toán"
+    )
 
-            [
+    # gửi admin
 
-                InlineKeyboardButton("✅ DUYỆT", callback_data=f"ok_ff_{user.id}"),
+    kb = InlineKeyboardMarkup()
 
-                InlineKeyboardButton("❌ HỦY", callback_data=f"no_ff_{user.id}")
-
-            ]
-
-        ])
-
-
-        await context.bot.send_message(
-
-            ADMIN_ID,
-
-            f"""
-
-🔥 ĐƠN FREE FIRE
-
-👤 @{user.username}
-
-🆔 {user.id}
-
-""",
-
-            reply_markup=keyboard
-
+    kb.add(
+        InlineKeyboardButton(
+            "✅ DUYỆT",
+            callback_data=f"ok|{user_id}"
+        ),
+        InlineKeyboardButton(
+            "❌ HỦY",
+            callback_data=f"no|{user_id}"
         )
+    )
 
+    await bot.send_message(
+        ADMIN_ID,
+        f"""
+Đơn hàng mới
 
-        await query.edit_message_caption("⏳ ĐÃ GỬI ADMIN DUYỆT")
+User: {username}
+Gói: {pack}
+ID: {user_id}
+        """,
+        reply_markup=kb
+    )
 
 
-# =====================
-# CHỌN ROBUX
-# =====================
+# ===== ADMIN APPROVE =====
 
-    elif query.data.startswith("rb_"):
+@dp.callback_query_handler(lambda c: c.data.startswith("ok"))
+async def approve(callback: types.CallbackQuery):
 
-        goi = query.data.split("_")[1]
+    user_id = int(callback.data.split("|")[1])
 
-        waiting_robux[user.id] = goi
+    await bot.send_message(
+        user_id,
+        "✅ Đơn đã được duyệt\nVui lòng chờ nhận"
+    )
 
+    await callback.answer("Đã duyệt")
 
-        await context.bot.send_photo(
 
-            user.id,
+# ===== ADMIN CANCEL =====
 
-            QR,
+@dp.callback_query_handler(lambda c: c.data.startswith("no"))
+async def cancel(callback: types.CallbackQuery):
 
-            caption=f"""
+    user_id = int(callback.data.split("|")[1])
 
-💎 GÓI: {goi} ROBUX
+    await bot.send_message(
+        user_id,
+        "❌ Đơn đã bị hủy"
+    )
 
-Nhập TÊN ROBLOX:
+    await callback.answer("Đã hủy")
 
-"""
 
-        )
+# ===== RUN =====
 
-
-# =====================
-# ADMIN DUYỆT FF
-# =====================
-
-    elif query.data.startswith("ok_ff_"):
-
-        uid = int(query.data.split("_")[2])
-
-        acc = load_ff()
-
-        if not acc:
-
-            await query.edit_message_text("Hết acc")
-
-            return
-
-
-        tk = acc.pop(0)
-
-        save_ff(acc)
-
-
-        await context.bot.send_message(
-
-            uid,
-
-            f"""
-
-🎉 MUA THÀNH CÔNG
-
-ACC:
-
-{tk}
-
-"""
-
-        )
-
-
-        await query.edit_message_text("ĐÃ GỬI ACC")
-
-
-# =====================
-# ADMIN HỦY FF
-# =====================
-
-    elif query.data.startswith("no_ff_"):
-
-        uid = int(query.data.split("_")[2])
-
-        await context.bot.send_message(
-
-            uid,
-
-            "❌ ĐƠN BỊ HỦY"
-
-        )
-
-
-        await query.edit_message_text("ĐÃ HỦY")
-
-
-# =====================
-# ADMIN DUYỆT ROBUX
-# =====================
-
-    elif query.data.startswith("ok_rb_"):
-
-        uid = int(query.data.split("_")[2])
-
-        await context.bot.send_message(
-
-            uid,
-
-            "🎉 ADMIN SẼ CHUYỂN ROBUX SỚM"
-
-        )
-
-
-        await query.edit_message_text("ĐÃ DUYỆT")
-
-
-# =====================
-# ADMIN HỦY ROBUX
-# =====================
-
-    elif query.data.startswith("no_rb_"):
-
-        uid = int(query.data.split("_")[2])
-
-        await context.bot.send_message(
-
-            uid,
-
-            "❌ ĐƠN BỊ HỦY"
-
-        )
-
-
-        await query.edit_message_text("ĐÃ HỦY")
-
-
-# =====================
-# NHẬP TÊN ROBLOX
-# =====================
-
-async def text(update, context):
-
-    user = update.message.from_user
-
-
-    if user.id in waiting_robux:
-
-        name = update.message.text
-
-        goi = waiting_robux[user.id]
-
-
-        keyboard = InlineKeyboardMarkup([
-
-            [
-
-                InlineKeyboardButton("✅ DUYỆT", callback_data=f"ok_rb_{user.id}"),
-
-                InlineKeyboardButton("❌ HỦY", callback_data=f"no_rb_{user.id}")
-
-            ]
-
-        ])
-
-
-        await context.bot.send_message(
-
-            ADMIN_ID,
-
-            f"""
-
-🪙 ĐƠN ROBUX
-
-👤 @{user.username}
-
-🆔 {user.id}
-
-🎮 Roblox: {name}
-
-💎 Gói: {goi}
-
-""",
-
-            reply_markup=keyboard
-
-        )
-
-
-        await update.message.reply_text(
-
-            "⏳ ĐÃ GỬI ADMIN DUYỆT"
-
-        )
-
-
-        del waiting_robux[user.id]
-
-
-# =====================
-# MAIN
-# =====================
-
-app = ApplicationBuilder().token(TOKEN).build()
-
-app.add_handler(CommandHandler("start", start))
-
-app.add_handler(MessageHandler(filters.Regex("FREE FIRE"), freefire))
-
-app.add_handler(MessageHandler(filters.Regex("ROBUX"), robux))
-
-app.add_handler(CallbackQueryHandler(button))
-
-app.add_handler(MessageHandler(filters.TEXT, text))
-
-print("BOT ĐANG CHẠY...")
-
-app.run_polling()
+if __name__ == "__main__":
+    executor.start_polling(dp)
