@@ -133,6 +133,15 @@ async def paid(call: types.CallbackQuery):
     user_id = call.from_user.id
 
 
+    # lấy username telegram
+    tele_username = call.from_user.username
+
+    if tele_username:
+        tele = f"@{tele_username}"
+    else:
+        tele = "Không có username"
+
+
     # chống spam
     if user_id in paid_users:
 
@@ -168,7 +177,9 @@ async def paid(call: types.CallbackQuery):
         f"""
 🛒 ĐƠN MUA ROBUX
 
-👤 ID: {user_id}
+👤 Telegram: {tele}
+
+🆔 ID: {user_id}
 
 🎮 Roblox: {username}
 
